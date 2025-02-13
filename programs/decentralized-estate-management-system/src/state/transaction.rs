@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 
 #[account]
-pub struct Vote {
+pub struct TransactionState {
     pub initiator: Pubkey,
     pub estate: Pubkey,
     pub bump: u8,
@@ -11,7 +11,7 @@ pub struct Vote {
     pub amount: u64,
 }
 
-impl Space for Vote {
+impl Space for TransactionState {
     const INIT_SPACE: usize = 8 + 32 + 32 + 1 + 8 + 1 + 8;
 }
 
