@@ -4,6 +4,7 @@ use crate::state::{EstateState, PollState};
 use crate::error::DemsError;
 
 #[derive(Accounts)]
+#[instruction(description: String)]
 pub struct Poll<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
@@ -13,14 +14,14 @@ pub struct Poll<'info> {
     )]
     pub estate: Account<'info, EstateState>,
     #[account(
-        init, payer = user, seeds = [b"poll", estate.key().as_ref(), user.key().as_ref()], bump, space = PollState::INIT_SPACE
+        init, payer = user, seeds = [b"poll", estate.key().as_ref(), user.key().as_ref(), description.as_str().as_bytes()], bump, space = PollState::INIT_SPACE
     )]
     pub poll: Account<'info, PollState>,
     pub system_program: Program<'info, System>,
 }
 
 impl<'info> Poll<'info> {
-    pub fn create_poll(&mut self, amount: u64, description: String,  bump: &PollBumps) -> Result<()> {
+    pub fn create_poll(&mut self, description: String, amount: u64, bump: &PollBumps) -> Result<()> {
 
         require!(description.len() > 0 && description.len() < (4 + 40), DemsError::NameTooLong);
 

@@ -8,6 +8,7 @@ pub struct Resident<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
     #[account(
+        mut,
         seeds = [b"estate", estate.name.as_str().as_bytes()],
         bump = estate.bump
     )]

@@ -3,26 +3,35 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program::{transfer, Transfer};
 
 use crate::error::DemsError;
-use crate::state::{EstateState, PollState, VoteState};
+use crate::state::{EstateState, PollState, VoteState, TransactionState};
 
 #[derive(Accounts)]
+#[instruction(seed: u64)]
 pub struct Vote<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
+    #[account(mut)]
+    pub poll_creator: SystemAccount<'info>,
     #[account(
+        mut,
         seeds = [b"estate", estate.name.as_str().as_bytes()],
         bump = estate.bump
     )]
     pub estate: Account<'info, EstateState>,
     #[account(
-        init_if_needed , payer = user, seeds = [b"vote", estate.key().as_ref(), user.key().as_ref()], bump, space = VoteState::INIT_SPACE
+        init_if_needed , payer = user, seeds = [b"vote", estate.key().as_ref(), user.key().as_ref(), poll.key().as_ref()], bump, space = VoteState::INIT_SPACE
     )]
     pub vote: Account<'info, VoteState>,
     #[account(
-        seeds = [b"poll", estate.key().as_ref(), user.key().as_ref()],
+        mut,
+        seeds = [b"poll", estate.key().as_ref(), poll.creator.key().as_ref(), poll.description.as_str().as_bytes()],
         bump = poll.bump
     )]
     pub poll: Account<'info, PollState>,
+    #[account(
+        init, payer = user, seeds = [b"transaction", estate.key().as_ref(), user.key().as_ref(), seed.to_le_bytes().as_ref()], bump, space = TransactionState::INIT_SPACE
+    )]
+    pub transaction: Account<'info, TransactionState>,
     #[account(
         mut,
         seeds = [b"vault", estate.key().as_ref()],
@@ -32,13 +41,8 @@ pub struct Vote<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub enum PollStatus {
-    Finalized(bool),
-    Pending,
-}
-
 impl<'info> Vote<'info> {
-    pub fn vote_in_poll(&mut self, vote: bool, bump: &VoteBumps) -> Result<()> {
+    pub fn vote_in_poll(&mut self, seed: u64, vote: bool, bump: &VoteBumps) -> Result<()> {
         require!(self.vote.is_initialized == false, DemsError::AlreadyVoted);
         require!(self.poll.active == true, DemsError::PollClose);
 
@@ -64,25 +68,35 @@ impl<'info> Vote<'info> {
         Ok(())
     }
 
-    pub fn compute_poll(&mut self) -> Result<()> {
+    pub fn compute_poll(&mut self, bump: &VoteBumps) -> Result<()> {
         let total_voters = self.estate.no_of_residents;
 
         let agree_votes = self.poll.agree_votes;
         let disagree_votes = self.poll.disagree_votes;
 
-        if agree_votes > (total_voters as f64 / 2.0).round() as u64 {
+        if agree_votes > (total_voters as u64 + 1) / 2 {
             self.release_funds()?;
 
             //update estate vault balance
             self.estate.vault_balance = self.vault.to_account_info().get_lamports();
 
+			//create transaction
+			self.record_transaction(self.poll.amount, bump.transaction);
+
             self.poll.active = false
-        } else if disagree_votes > (total_voters as f64 / 2.0).round() as u64 {
-            self.poll.active = false
+        } else if disagree_votes > (total_voters as u64 + 1) / 2 {
+            self.poll.active = false;
+
+            //close transaction account
+            self.close_transaction_account();
+
         } else if agree_votes == disagree_votes
             && agree_votes + disagree_votes == total_voters as u64
         {
-            self.poll.active = false
+            self.poll.active = false;
+
+            //close transaction account
+            self.close_transaction_account();
         }
 
         Ok(())
@@ -92,7 +106,7 @@ impl<'info> Vote<'info> {
 
         let cpi_accounts = Transfer {
             from: self.vault.to_account_info(),
-            to: self.user.to_account_info(),
+            to: self.poll_creator.to_account_info(),
         };
 
         let signer_seeds: [&[&[u8]]; 1] = [&[
@@ -104,6 +118,50 @@ impl<'info> Vote<'info> {
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, &signer_seeds);
 
         transfer(cpi_ctx, self.poll.amount)?;
+
+        Ok(())
+    }
+	pub fn record_transaction(&mut self, amount: u64, bump: u8) -> Result<()> {
+
+
+        let clock = Clock::get()?.unix_timestamp;
+        let is_deposit = false;
+
+        self.transaction.set_inner(TransactionState {
+            bump,
+            estate: self.estate.key(),
+            is_deposit,
+            amount,
+            timestamp: clock,
+            from: self.vault.to_account_info().key(),
+            to: self.poll.creator
+        });
+
+        Ok(())
+    }
+    pub fn close_transaction_account(&mut self) -> Result<()> {
+
+       self.transaction.to_account_info().data.borrow_mut().fill(0);
+
+       let cpi_program = self.system_program.to_account_info();
+
+       let cpi_accouts = Transfer {
+           from: self.transaction.to_account_info(),
+           to: self.user.to_account_info(),
+       };
+
+       let signer_seeds: [&[&[u8]]; 1] = [&[
+           b"transaction",
+           self.estate.to_account_info().key.as_ref(),
+           self.user.to_account_info().key.as_ref(),
+           &[self.transaction.bump]
+       ]];
+
+       let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accouts, &signer_seeds);
+
+       let amount = self.transaction.to_account_info().get_lamports();
+
+       transfer(cpi_ctx, amount);
 
         Ok(())
     }
