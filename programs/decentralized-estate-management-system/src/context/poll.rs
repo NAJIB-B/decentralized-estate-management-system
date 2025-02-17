@@ -26,6 +26,7 @@ impl<'info> Poll<'info> {
         require!(description.len() < (4 + 40), DemsError::DescriptionTooLong);
         require!(description.len() > 0, DemsError::InvalidDescription);
         require!(amount < self.estate.vault_balance, DemsError::ExceededBalance);
+        require!(amount > 0, DemsError::InvalidAmount);
 
 
         self.poll.set_inner(PollState {

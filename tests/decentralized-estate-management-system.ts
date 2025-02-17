@@ -431,12 +431,8 @@ describe("decentralized-estate-management-system tests", () => {
         .rpc();
 
       expect.fail("Expected the transaction to fail, but it succeeded.");
-
     } catch (error) {
-      expect(error.error.errorMessage).to.include(
-        "Amount is invalid"
-      );
-
+      expect(error.error.errorMessage).to.include("Amount is invalid");
     }
   });
   it("Should fail because poll description is too long", async () => {
@@ -640,76 +636,98 @@ describe("decentralized-estate-management-system tests", () => {
         .signers([resident1])
         .rpc();
 
-        expect.fail("Expected the transaction to fail, but it succeeded.");
+      expect.fail("Expected the transaction to fail, but it succeeded.");
     } catch (error) {
-        expect(error.error.errorMessage).to.include("Amount exceeds vault balance");
+      expect(error.error.errorMessage).to.include(
+        "Amount exceeds vault balance"
+      );
     }
   });
-   it("disagree vote win in poll", async () => {
-     const vote_in_poll = async (
-       user: anchor.web3.Keypair,
-       user_vote: boolean
-     ) => {
-       try {
-         const seed = new BN(randomBytes(8));
-         const votePda = PublicKey.findProgramAddressSync(
-           [
-             Buffer.from("vote"),
-             estatePda.toBuffer(),
-             user.publicKey.toBuffer(),
-             pollPda2.toBuffer(),
-           ],
-           program.programId
-         )[0];
 
-         const transactionPda = PublicKey.findProgramAddressSync(
-           [
-             Buffer.from("transaction"),
-             estatePda.toBuffer(),
-             user.publicKey.toBuffer(),
-             seed.toArrayLike(Buffer, "le", 8),
-           ],
-           program.programId
-         )[0];
+  it("Should fail for poll amount being 0", async () => {
+    const oneSol = new BN(0);
+    try {
+      const tx = await program.methods
+        .createPoll(description3, oneSol)
+        .accountsStrict({
+          user: resident1.publicKey,
+          estate: estatePda,
+          poll: pollPda3,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([resident1])
+        .rpc();
 
-         const tx = await program.methods
-           .vote(seed, user_vote)
-           .accountsStrict({
-             user: user.publicKey,
-             estate: estatePda,
-             vault: vaultPda,
-             poll: pollPda2,
-             pollCreator: resident1.publicKey,
-             vote: votePda,
-             transaction: transactionPda,
-             systemProgram: anchor.web3.SystemProgram.programId,
-           })
-           .signers([user])
-           .rpc();
+      expect.fail("Expected the transaction to fail, but it succeeded.");
+    } catch (error) {
+      expect(error.error.errorMessage).to.include("Amount is invalid");
+    }
+  });
+  it("disagree vote win in poll", async () => {
+    const vote_in_poll = async (
+      user: anchor.web3.Keypair,
+      user_vote: boolean
+    ) => {
+      try {
+        const seed = new BN(randomBytes(8));
+        const votePda = PublicKey.findProgramAddressSync(
+          [
+            Buffer.from("vote"),
+            estatePda.toBuffer(),
+            user.publicKey.toBuffer(),
+            pollPda2.toBuffer(),
+          ],
+          program.programId
+        )[0];
 
-         let vote = await program.account.voteState.fetch(votePda);
+        const transactionPda = PublicKey.findProgramAddressSync(
+          [
+            Buffer.from("transaction"),
+            estatePda.toBuffer(),
+            user.publicKey.toBuffer(),
+            seed.toArrayLike(Buffer, "le", 8),
+          ],
+          program.programId
+        )[0];
 
-         assert.equal(vote.voter.toBase58(), user.publicKey.toBase58());
-         assert.equal(vote.vote, user_vote);
-       } catch (error) {
-         console.log(error);
-       }
-     };
+        const tx = await program.methods
+          .vote(seed, user_vote)
+          .accountsStrict({
+            user: user.publicKey,
+            estate: estatePda,
+            vault: vaultPda,
+            poll: pollPda2,
+            pollCreator: resident1.publicKey,
+            vote: votePda,
+            transaction: transactionPda,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .signers([user])
+          .rpc();
 
-     await vote_in_poll(resident1, false);
-     await vote_in_poll(resident2, false);
-     await vote_in_poll(resident3, false);
-     await vote_in_poll(resident4, false);
+        let vote = await program.account.voteState.fetch(votePda);
 
-     let poll = await program.account.pollState.fetch(pollPda2);
-     let estate = await program.account.estateState.fetch(estatePda);
-     let vaultBalance = await provider.connection.getBalance(vaultPda);
+        assert.equal(vote.voter.toBase58(), user.publicKey.toBase58());
+        assert.equal(vote.vote, user_vote);
+      } catch (error) {
+        console.log(error);
+      }
+    };
 
-     assert.equal(poll.disagreeVotes.toNumber(), 4);
-     assert.equal(poll.active, false);
+    await vote_in_poll(resident1, false);
+    await vote_in_poll(resident2, false);
+    await vote_in_poll(resident3, false);
+    await vote_in_poll(resident4, false);
 
-     assert.equal(estate.vaultBalance.toNumber(), vaultBalance);
-   });
+    let poll = await program.account.pollState.fetch(pollPda2);
+    let estate = await program.account.estateState.fetch(estatePda);
+    let vaultBalance = await provider.connection.getBalance(vaultPda);
+
+    assert.equal(poll.disagreeVotes.toNumber(), 4);
+    assert.equal(poll.active, false);
+
+    assert.equal(estate.vaultBalance.toNumber(), vaultBalance);
+  });
   it("create poll to draw", async () => {
     const oneSol = new BN(10000);
     try {
@@ -736,72 +754,72 @@ describe("decentralized-estate-management-system tests", () => {
       console.log(error);
     }
   });
-   it("poll should end in draw", async () => {
-     const vote_in_poll = async (
-       user: anchor.web3.Keypair,
-       user_vote: boolean
-     ) => {
-       try {
-         const seed = new BN(randomBytes(8));
-         const votePda = PublicKey.findProgramAddressSync(
-           [
-             Buffer.from("vote"),
-             estatePda.toBuffer(),
-             user.publicKey.toBuffer(),
-             pollPda4.toBuffer(),
-           ],
-           program.programId
-         )[0];
+  it("poll should end in draw", async () => {
+    const vote_in_poll = async (
+      user: anchor.web3.Keypair,
+      user_vote: boolean
+    ) => {
+      try {
+        const seed = new BN(randomBytes(8));
+        const votePda = PublicKey.findProgramAddressSync(
+          [
+            Buffer.from("vote"),
+            estatePda.toBuffer(),
+            user.publicKey.toBuffer(),
+            pollPda4.toBuffer(),
+          ],
+          program.programId
+        )[0];
 
-         const transactionPda = PublicKey.findProgramAddressSync(
-           [
-             Buffer.from("transaction"),
-             estatePda.toBuffer(),
-             user.publicKey.toBuffer(),
-             seed.toArrayLike(Buffer, "le", 8),
-           ],
-           program.programId
-         )[0];
+        const transactionPda = PublicKey.findProgramAddressSync(
+          [
+            Buffer.from("transaction"),
+            estatePda.toBuffer(),
+            user.publicKey.toBuffer(),
+            seed.toArrayLike(Buffer, "le", 8),
+          ],
+          program.programId
+        )[0];
 
-         const tx = await program.methods
-           .vote(seed, user_vote)
-           .accountsStrict({
-             user: user.publicKey,
-             estate: estatePda,
-             vault: vaultPda,
-             poll: pollPda4,
-             pollCreator: resident1.publicKey,
-             vote: votePda,
-             transaction: transactionPda,
-             systemProgram: anchor.web3.SystemProgram.programId,
-           })
-           .signers([user])
-           .rpc();
+        const tx = await program.methods
+          .vote(seed, user_vote)
+          .accountsStrict({
+            user: user.publicKey,
+            estate: estatePda,
+            vault: vaultPda,
+            poll: pollPda4,
+            pollCreator: resident1.publicKey,
+            vote: votePda,
+            transaction: transactionPda,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .signers([user])
+          .rpc();
 
-         let vote = await program.account.voteState.fetch(votePda);
+        let vote = await program.account.voteState.fetch(votePda);
 
-         assert.equal(vote.voter.toBase58(), user.publicKey.toBase58());
-         assert.equal(vote.vote, user_vote);
-       } catch (error) {
-         console.log(error);
-       }
-     };
+        assert.equal(vote.voter.toBase58(), user.publicKey.toBase58());
+        assert.equal(vote.vote, user_vote);
+      } catch (error) {
+        console.log(error);
+      }
+    };
 
-     await vote_in_poll(resident1, false);
-     await vote_in_poll(resident2, false);
-     await vote_in_poll(resident3, false);
-     await vote_in_poll(resident4, true);
-     await vote_in_poll(resident5, true);
-     await vote_in_poll(leader, true);
+    await vote_in_poll(resident1, false);
+    await vote_in_poll(resident2, false);
+    await vote_in_poll(resident3, false);
+    await vote_in_poll(resident4, true);
+    await vote_in_poll(resident5, true);
+    await vote_in_poll(leader, true);
 
-     let poll = await program.account.pollState.fetch(pollPda4);
-     let estate = await program.account.estateState.fetch(estatePda);
-     let vaultBalance = await provider.connection.getBalance(vaultPda);
+    let poll = await program.account.pollState.fetch(pollPda4);
+    let estate = await program.account.estateState.fetch(estatePda);
+    let vaultBalance = await provider.connection.getBalance(vaultPda);
 
-     assert.equal(poll.disagreeVotes.toNumber(), 3);
-     assert.equal(poll.agreeVotes.toNumber(), 3);
-     assert.equal(poll.active, false);
+    assert.equal(poll.disagreeVotes.toNumber(), 3);
+    assert.equal(poll.agreeVotes.toNumber(), 3);
+    assert.equal(poll.active, false);
 
-     assert.equal(estate.vaultBalance.toNumber(), vaultBalance);
-   });
+    assert.equal(estate.vaultBalance.toNumber(), vaultBalance);
+  });
 });
