@@ -35,7 +35,8 @@ pub struct Estate<'info> {
 impl<'info> Estate<'info> {
     pub fn create_estate(&mut self, name: String, bumps: &EstateBumps) -> Result<()> {
 
-        require!(name.len() > 0 && name.len() < 4 + 32, DemsError::NameTooLong);
+        require!(name.len() < 4 + 32, DemsError::NameTooLong);
+        require!(name.len() > 0, DemsError::InvalidName);
 
 
         self.estate.set_inner(EstateState {

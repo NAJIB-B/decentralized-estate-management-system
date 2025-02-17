@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program::{transfer, Transfer};
 
 use crate::state::{EstateState, ResidentState, TransactionState};
+use crate::error::DemsError;
 
 #[derive(Accounts)]
 #[instruction(seed: u64)]
@@ -35,7 +36,8 @@ pub struct Deposit<'info> {
 }
 
 impl<'info> Deposit<'info> {
-    pub fn deposit(&mut self, seed: u64, amount: u64, bump: &DepositBumps) -> Result<()> {
+    pub fn deposit(&mut self, _seed: u64, amount: u64, bump: &DepositBumps) -> Result<()> {
+        require!(amount > 0, DemsError::InvalidAmount);
         let cpi_program = self.system_program.to_account_info();
 
         let cpi_accounts = Transfer {

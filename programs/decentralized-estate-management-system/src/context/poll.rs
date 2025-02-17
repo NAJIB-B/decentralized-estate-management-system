@@ -23,7 +23,9 @@ pub struct Poll<'info> {
 impl<'info> Poll<'info> {
     pub fn create_poll(&mut self, description: String, amount: u64, bump: &PollBumps) -> Result<()> {
 
-        require!(description.len() > 0 && description.len() < (4 + 40), DemsError::NameTooLong);
+        require!(description.len() < (4 + 40), DemsError::DescriptionTooLong);
+        require!(description.len() > 0, DemsError::InvalidDescription);
+        require!(amount < self.estate.vault_balance, DemsError::ExceededBalance);
 
 
         self.poll.set_inner(PollState {
