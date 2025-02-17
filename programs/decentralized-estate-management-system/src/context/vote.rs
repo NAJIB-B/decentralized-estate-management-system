@@ -138,6 +138,9 @@ impl<'info> Vote<'info> {
     }
     pub fn close_transaction_account(&mut self) -> Result<()> {
 
+        //clear account data
+        self.transaction.to_account_info().data.borrow_mut().fill(0);
+
         let lamports = self.transaction.to_account_info().lamports();
 
         // Transfer lamports from the account to the user
